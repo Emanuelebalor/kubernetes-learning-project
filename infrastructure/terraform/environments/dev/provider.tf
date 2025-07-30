@@ -1,10 +1,10 @@
 provider "aws" {
-  region = "eu-central-1"
+  region = var.region
   
   default_tags {
     tags = {
-      Environment = "dev"
-      Project     = "k8s-learning"
+      Environment = var.environment
+      Project     = var.project_name
       ManagedBy   = "terraform"
     }
   }
