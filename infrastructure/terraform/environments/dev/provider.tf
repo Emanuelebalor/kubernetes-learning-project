@@ -1,9 +1,7 @@
 provider "aws" {
   region = var.region
   
-  assume_role {
-    role_arn = "arn:aws:iam::981360893428:role/TerraformServiceRole"
-  }
+  # Removed assume_role - using direct credentials
   
   default_tags {
     tags = {
