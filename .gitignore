@@ -31,3 +31,12 @@ secrets/
 
 # IAM Policies with sensitive info
 infrastructure/iam/policies/active/*.json
+
+# Terraform variables that might contain secrets
+terraform.tfvars
+*.auto.tfvars
+*-secrets.tfvars
+
+# But allow example files
+!terraform.tfvars.example
+!*.example
