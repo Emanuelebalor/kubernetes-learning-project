@@ -28,3 +28,6 @@ Thumbs.db
 secrets/
 *.pem
 *.key
+
+# IAM Policies with sensitive info
+infrastructure/iam/policies/active/*.json
