@@ -28,7 +28,7 @@ systemctl enable amazon-ssm-agent
 systemctl start amazon-ssm-agent
 
 # Set hostname
-hostnamectl set-hostname ${CLUSTER_NAME}-master
+hostnamectl set-hostname ${cluster_name}-master
 
 # Disable swap (required for Kubernetes)
 swapoff -a

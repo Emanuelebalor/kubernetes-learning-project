@@ -2,9 +2,9 @@
 # Kubernetes worker node initialization script
 
 # Set variables from Terraform
-CLUSTER_NAME="${cluster_name}"
+cluster_name="${cluster_name}"
 REGION="${region}"
-WORKER_NUMBER="${worker_number}"
+worker_number="${worker_number}"
 MASTER_IP="${master_ip}"
 
 # Update system
@@ -30,10 +30,10 @@ systemctl enable amazon-ssm-agent
 systemctl start amazon-ssm-agent
 
 # Set hostname
-hostnamectl set-hostname ${CLUSTER_NAME}-worker-${WORKER_NUMBER}
+hostnamectl set-hostname ${cluster_name}-worker-${worker_number}
 
 # Add master IP to hosts file for easy reference
-echo "${MASTER_IP} ${CLUSTER_NAME}-master" >> /etc/hosts
+echo "${master_ip} ${cluster_name}-master" >> /etc/hosts
 
 # Disable swap
 swapoff -a
@@ -44,4 +44,4 @@ echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf
 sysctl -p
 
 # Log initialization completion
-echo "Worker node ${WORKER_NUMBER} initialization completed at $(date)" >> /var/log/k8s-init.log
+echo "Worker node ${worker_number} initialization completed at $(date)" >> /var/log/k8s-init.log

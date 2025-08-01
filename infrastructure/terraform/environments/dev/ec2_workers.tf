@@ -116,13 +116,6 @@ module "k8s_workers" {
       volume_size = var.worker_root_volume_size
       throughput  = 125
       iops        = 3000
-      tags = merge(
-        var.common_tags,
-        {
-          Name = "${var.project_name}-${var.environment}-k8s-worker-${count.index + 1}-root"
-          Type = "kubernetes-worker"
-        }
-      )
     }
   ]
 

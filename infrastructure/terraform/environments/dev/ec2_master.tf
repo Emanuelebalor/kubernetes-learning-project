@@ -132,13 +132,6 @@ module "k8s_master" {
       volume_size = var.master_root_volume_size
       throughput  = 125
       iops        = 3000
-      tags = merge(
-        var.common_tags,
-        {
-          Name = "${var.project_name}-${var.environment}-k8s-master-root"
-          Type = "kubernetes-master"
-        }
-      )
     }
   ]
 
