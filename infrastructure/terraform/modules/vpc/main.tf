@@ -1,7 +1,10 @@
 # vpc.tf - VPC infrastructure definition for Kubernetes learning project
 # This file is responsible solely for VPC and networking infrastructure
 # All VPC-related configuration is contained here for easy maintenance and understanding
-
+locals {
+  # Construct Kubernetes cluster name if not explicitly provided
+  kubernetes_cluster_name = var.kubernetes_cluster_name != "" ? var.kubernetes_cluster_name : "${var.project_name}-${var.environment}"
+}
 # VPC Module - Creates our foundational networking layer
 # Using the official AWS VPC module to establish networking best practices
 module "vpc" {
@@ -10,10 +13,11 @@ module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "~> 5.0"
 
+
   # Basic VPC identification and configuration
   # Name combines project and environment for clear identification in AWS Console
-  name = "${var.project_name}-${var.environment}-vpc"
-  cidr = var.vpc_cidr
+  name = "${var.project_name}-${var.environment}-vpc" #No declaration found for "var.project_name" No declaration found for "var.environment"
+  cidr = var.vpc_cidr # No declaration found for "var.vpc_cidr"
 
   # Availability Zone configuration
   # Using single AZ for learning simplicity while maintaining flexibility for future expansion
@@ -40,9 +44,9 @@ module "vpc" {
   # Comprehensive tagging strategy for resource management and cost tracking
   # Tags help with organization, cost allocation, and automated resource management
   tags = merge(var.common_tags, {
-    Name        = "${var.project_name}-${var.environment}-vpc"
-    Environment = var.environment
-    Project     = var.project_name
+    Name        = "${var.project_name}-${var.environment}-vpc" # No declaration found for "var.project_name" No declaration found for "var.environment"
+    Environment = var.environment #No declaration found for "var.environment"
+    Project     = var.project_name #No declaration found for "var.project_name"
   })
 
   # Kubernetes-specific subnet tagging for AWS Load Balancer Controller integration
@@ -52,14 +56,14 @@ module "vpc" {
     Name                                              = "${var.project_name}-${var.environment}-public-subnet"
     Type                                              = "public"
     "kubernetes.io/role/elb"                         = "1"      # Enables ALB placement in this subnet
-    "kubernetes.io/cluster/${var.kubernetes_cluster_name}" = "shared" # Indicates subnet is shared by cluster
+    "kubernetes.io/cluster/${local.kubernetes_cluster_name}" = "shared"# Indicates subnet is shared by cluster
   })
 
   private_subnet_tags = merge(var.common_tags, {
     Name                                                      = "${var.project_name}-${var.environment}-private-subnet"
     Type                                                      = "private"
     "kubernetes.io/role/internal-elb"                        = "1"      # Enables internal LB placement
-    "kubernetes.io/cluster/${var.kubernetes_cluster_name}"   = "shared" # Cluster association for internal services
+    "kubernetes.io/cluster/${local.kubernetes_cluster_name}" = "shared"# Cluster association for internal services
   })
 
   # Additional resource-specific tagging for better organization and cost tracking
