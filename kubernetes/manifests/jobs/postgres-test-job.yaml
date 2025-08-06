@@ -1,0 +1,69 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-test
+  namespace: postgresql
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: postgres-test
+        image: postgres:15-alpine
+        env:
+        - name: PGPASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: POSTGRES_PASSWORD
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "=== PostgreSQL Connection Test ==="
+          echo "Testing connection to postgres.postgresql.svc.cluster.local:5432"
+          
+          # Wait for database to be ready
+          until pg_isready -h postgres.postgresql -p 5432 -U taskuser; do
+            echo "Waiting for PostgreSQL to be ready..."
+            sleep 2
+          done
+          
+          echo "✓ PostgreSQL is ready!"
+          
+          # Test database connection and check tables
+          psql -h postgres.postgresql -U taskuser -d taskdb << 'EOF'
+          -- Check if we can connect
+          SELECT version();
+          
+          -- Verify tables exist
+          SELECT table_name FROM information_schema.tables 
+          WHERE table_schema = 'public' 
+          ORDER BY table_name;
+          
+          -- Test insert into users table
+          INSERT INTO users (username, password_hash, email) 
+          VALUES ('testuser', 'hash123', 'test@example.com');
+          
+          -- Test insert into tasks table
+          INSERT INTO tasks (user_id, title, description, status) 
+          VALUES (1, 'Test Task', 'Verify database works', 'pending');
+          
+          -- Verify data was inserted
+          SELECT COUNT(*) as user_count FROM users;
+          SELECT COUNT(*) as task_count FROM tasks;
+          
+          -- Test the indexes exist
+          SELECT indexname FROM pg_indexes 
+          WHERE schemaname = 'public' 
+          ORDER BY indexname;
+          
+          -- Clean up test data
+          DELETE FROM tasks WHERE title = 'Test Task';
+          DELETE FROM users WHERE username = 'testuser';
+          
+          -- Final verification
+          \dt
+          EOF
+          
+          echo "✓ All PostgreSQL tests passed!"

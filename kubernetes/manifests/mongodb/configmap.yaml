@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mongodb-config
+  namespace: mongodb
+data:
+  # MongoDB initialization script that runs on first startup
+  init-mongo.js: |
+    // Wait for MongoDB to be ready
+    sleep(2000);
+    
+    // Switch to admin database to create application user
+    admin = db.getSiblingDB('admin');
+    
+    // Create application user with specific permissions
+    admin.auth('mongoadmin', 'mongopass123');
+    
+    // Switch to application database
+    db = db.getSiblingDB('taskapp');
+    
+    // Create application user for the taskapp database
+    db.createUser({
+      user: 'taskuser',
+      pwd: 'taskpass123',
+      roles: [
+        { role: 'readWrite', db: 'taskapp' }
+      ]
+    });
+    
+    // Create collections with validation rules
+    db.createCollection('notifications', {
+      validator: {
+        $jsonSchema: {
+          bsonType: 'object',
+          required: ['userId', 'message', 'type', 'createdAt'],
+          properties: {
+            userId: {
+              bsonType: 'number',
+              description: 'User ID from PostgreSQL'
+            },
+            taskId: {
+              bsonType: 'number',
+              description: 'Task ID from PostgreSQL'
+            },
+            message: {
+              bsonType: 'string',
+              description: 'Notification message'
+            },
+            type: {
+              enum: ['task_created', 'task_updated', 'task_completed', 'task_deleted'],
+              description: 'Notification type'
+            },
+            status: {
+              enum: ['pending', 'sent', 'failed'],
+              description: 'Notification status'
+            },
+            createdAt: {
+              bsonType: 'date',
+              description: 'Creation timestamp'
+            },
+            sentAt: {
+              bsonType: 'date',
+              description: 'When notification was sent'
+            }
+          }
+        }
+      }
+    });
+    
+    // Create analytics collection for time-series data
+    db.createCollection('analytics', {
+      validator: {
+        $jsonSchema: {
+          bsonType: 'object',
+          required: ['metric', 'value', 'timestamp'],
+          properties: {
+            metric: {
+              bsonType: 'string',
+              description: 'Metric name'
+            },
+            value: {
+              bsonType: 'number',
+              description: 'Metric value'
+            },
+            userId: {
+              bsonType: 'number',
+              description: 'Optional user ID'
+            },
+            metadata: {
+              bsonType: 'object',
+              description: 'Additional metric metadata'
+            },
+            timestamp: {
+              bsonType: 'date',
+              description: 'Metric timestamp'
+            }
+          }
+        }
+      }
+    });
+    
+    // Create indexes for better query performance
+    db.notifications.createIndex({ userId: 1, createdAt: -1 });
+    db.notifications.createIndex({ taskId: 1 });
+    db.notifications.createIndex({ status: 1 });
+    db.analytics.createIndex({ metric: 1, timestamp: -1 });
+    db.analytics.createIndex({ userId: 1, metric: 1, timestamp: -1 });

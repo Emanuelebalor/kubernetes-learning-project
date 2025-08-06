@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: postgresql
+spec:
+  serviceName: postgres-headless  # Must point to the headless service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  # This ensures pods are updated one at a time during rolling updates
+  updateStrategy:
+    type: RollingUpdate
+  # Pod template
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      # This ensures PostgreSQL shuts down gracefully
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: postgres
+        image: postgres:15-alpine  # Using PostgreSQL 15 for latest features
+        ports:
+        - containerPort: 5432
+          name: postgres
+        
+        # Environment variables from Secret
+        envFrom:
+        - secretRef:
+            name: postgres-secret
+        
+        # Additional environment variables
+        env:
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata  # Subdirectory for PostgreSQL data
+        
+        # Resource limits - important for databases
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        
+        # Health checks
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        readinessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - pg_isready -U $POSTGRES_USER -d $POSTGRES_DB
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        
+        # Volume mounts
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        - name: init-script
+          mountPath: /docker-entrypoint-initdb.d
+      
+      # Init container to set proper permissions
+      initContainers:
+      - name: postgres-init
+        image: busybox:1.35
+        command: ['sh', '-c', 'chown -R 999:999 /var/lib/postgresql/data']
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+      
+      volumes:
+      - name: init-script
+        configMap:
+          name: postgres-config
+  
+  # PVC template for persistent storage
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-storage
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: "standard"  # Default for Minikube
+      resources:
+        requests:
+          storage: 2Gi

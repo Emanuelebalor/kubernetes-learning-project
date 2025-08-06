@@ -1,0 +1,98 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mongodb-test
+  namespace: mongodb
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: mongodb-test
+        image: mongo:6.0
+        env:
+        - name: MONGO_USERNAME
+          value: "taskuser"
+        - name: MONGO_PASSWORD
+          value: "taskpass123"
+        command:
+        - /bin/sh
+        - -c
+        - |
+          echo "=== MongoDB Connection Test ==="
+          echo "Testing connection to mongodb.mongodb.svc.cluster.local:27017"
+          
+          # Wait for MongoDB to be ready
+          until mongosh --host mongodb.mongodb --eval "db.adminCommand('ping')"; do
+            echo "Waiting for MongoDB to be ready..."
+            sleep 2
+          done
+          
+          echo "✓ MongoDB is ready!"
+          
+          # Run comprehensive tests
+          mongosh --host mongodb.mongodb \
+                  --username "$MONGO_USERNAME" \
+                  --password "$MONGO_PASSWORD" \
+                  --authenticationDatabase taskapp \
+                  taskapp << 'EOF'
+          
+          print("=== Testing MongoDB Collections ===");
+          
+          // Show all collections
+          print("\nCollections in taskapp database:");
+          db.getCollectionNames().forEach(function(collection) {
+              print("- " + collection);
+          });
+          
+          // Test notifications collection
+          print("\n=== Testing notifications collection ===");
+          db.notifications.insertOne({
+              userId: 1,
+              taskId: 1,
+              message: "Test notification",
+              type: "task_created",
+              status: "pending",
+              createdAt: new Date()
+          });
+          
+          // Verify insert
+          let notificationCount = db.notifications.countDocuments();
+          print("Notification count: " + notificationCount);
+          
+          // Test analytics collection  
+          print("\n=== Testing analytics collection ===");
+          db.analytics.insertOne({
+              metric: "test_metric",
+              value: 42,
+              userId: 1,
+              timestamp: new Date()
+          });
+          
+          // Verify insert
+          let analyticsCount = db.analytics.countDocuments();
+          print("Analytics count: " + analyticsCount);
+          
+          // Check indexes
+          print("\n=== Indexes ===");
+          db.notifications.getIndexes().forEach(function(index) {
+              print("notifications: " + JSON.stringify(index.key));
+          });
+          
+          db.analytics.getIndexes().forEach(function(index) {
+              print("analytics: " + JSON.stringify(index.key));
+          });
+          
+          // Test queries
+          print("\n=== Testing queries ===");
+          let result = db.notifications.find({userId: 1}).count();
+          print("Notifications for user 1: " + result);
+          
+          // Cleanup
+          db.notifications.deleteMany({message: "Test notification"});
+          db.analytics.deleteMany({metric: "test_metric"});
+          
+          print("\n✓ All MongoDB tests passed!");
+          EOF
+          
+          echo "✓ MongoDB test completed successfully!"
