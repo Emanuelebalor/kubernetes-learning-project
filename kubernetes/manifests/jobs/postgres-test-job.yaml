@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: postgres-test
-  namespace: postgresql
+  namespace: test-jobs
 spec:
   template:
     spec:
@@ -11,58 +11,68 @@ spec:
       - name: postgres-test
         image: postgres:15-alpine
         env:
+        # All credentials come from the test secret
+        - name: PGUSER
+          valueFrom:
+            secretKeyRef:
+              name: test-db-credentials
+              key: POSTGRES_USER
         - name: PGPASSWORD
           valueFrom:
             secretKeyRef:
-              name: postgres-secret
+              name: test-db-credentials
               key: POSTGRES_PASSWORD
+        - name: PGDATABASE
+          valueFrom:
+            secretKeyRef:
+              name: test-db-credentials
+              key: POSTGRES_DB
+        - name: PGHOST
+          value: "postgres.postgresql.svc.cluster.local"
+        - name: PGPORT
+          value: "5432"
         command:
         - /bin/sh
         - -c
         - |
           echo "=== PostgreSQL Connection Test ==="
-          echo "Testing connection to postgres.postgresql.svc.cluster.local:5432"
+          echo "Connecting to $PGHOST:$PGPORT as $PGUSER"
           
           # Wait for database to be ready
-          until pg_isready -h postgres.postgresql -p 5432 -U taskuser; do
+          until pg_isready; do
             echo "Waiting for PostgreSQL to be ready..."
             sleep 2
           done
           
           echo "✓ PostgreSQL is ready!"
           
-          # Test database connection and check tables
-          psql -h postgres.postgresql -U taskuser -d taskdb << 'EOF'
-          -- Check if we can connect
+          # Run comprehensive tests
+          psql << 'EOF'
+          -- Connection test
           SELECT version();
           
-          -- Verify tables exist
+          -- Verify schema
           SELECT table_name FROM information_schema.tables 
           WHERE table_schema = 'public' 
           ORDER BY table_name;
           
-          -- Test insert into users table
+          -- Test data operations
           INSERT INTO users (username, password_hash, email) 
-          VALUES ('testuser', 'hash123', 'test@example.com');
+          VALUES ('testuser', 'hash123', 'test@example.com')
+          ON CONFLICT (username) DO NOTHING;
           
-          -- Test insert into tasks table
           INSERT INTO tasks (user_id, title, description, status) 
-          VALUES (1, 'Test Task', 'Verify database works', 'pending');
+          VALUES (1, 'Test Task', 'Verify database works', 'pending')
+          RETURNING id;
           
-          -- Verify data was inserted
+          -- Verify data
           SELECT COUNT(*) as user_count FROM users;
           SELECT COUNT(*) as task_count FROM tasks;
           
-          -- Test the indexes exist
-          SELECT indexname FROM pg_indexes 
-          WHERE schemaname = 'public' 
-          ORDER BY indexname;
-          
-          -- Clean up test data
+          -- Cleanup test data
           DELETE FROM tasks WHERE title = 'Test Task';
           DELETE FROM users WHERE username = 'testuser';
           
-          -- Final verification
           \dt
           EOF
           

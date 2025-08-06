@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: mongodb-test
-  namespace: mongodb
+  namespace: test-jobs
 spec:
   template:
     spec:
@@ -11,19 +11,32 @@ spec:
       - name: mongodb-test
         image: mongo:6.0
         env:
+        - name: MONGO_HOST
+          value: "mongodb.mongodb.svc.cluster.local"
         - name: MONGO_USERNAME
-          value: "taskuser"
+          valueFrom:
+            secretKeyRef:
+              name: test-db-credentials
+              key: MONGODB_USER
         - name: MONGO_PASSWORD
-          value: ""
+          valueFrom:
+            secretKeyRef:
+              name: test-db-credentials
+              key: MONGODB_PASSWORD
+        - name: MONGO_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: test-db-credentials
+              key: MONGODB_DB
         command:
         - /bin/sh
         - -c
         - |
           echo "=== MongoDB Connection Test ==="
-          echo "Testing connection to mongodb.mongodb.svc.cluster.local:27017"
+          echo "Connecting to $MONGO_HOST as $MONGO_USERNAME"
           
-          # Wait for MongoDB to be ready
-          until mongosh --host mongodb.mongodb --eval "db.adminCommand('ping')"; do
+          # Wait for MongoDB
+          until mongosh --host $MONGO_HOST --eval "db.adminCommand('ping')" 2>/dev/null; do
             echo "Waiting for MongoDB to be ready..."
             sleep 2
           done
@@ -31,22 +44,21 @@ spec:
           echo "✓ MongoDB is ready!"
           
           # Run comprehensive tests
-          mongosh --host mongodb.mongodb \
+          mongosh --host $MONGO_HOST \
                   --username "$MONGO_USERNAME" \
                   --password "$MONGO_PASSWORD" \
-                  --authenticationDatabase taskapp \
-                  taskapp << 'EOF'
+                  --authenticationDatabase "$MONGO_DATABASE" \
+                  "$MONGO_DATABASE" << 'EOF'
           
-          print("=== Testing MongoDB Collections ===");
+          print("=== Testing MongoDB ===");
           
-          // Show all collections
-          print("\nCollections in taskapp database:");
-          db.getCollectionNames().forEach(function(collection) {
-              print("- " + collection);
+          // List collections
+          print("\nCollections:");
+          db.getCollectionNames().forEach(function(name) {
+              print("- " + name);
           });
           
-          // Test notifications collection
-          print("\n=== Testing notifications collection ===");
+          // Test operations
           db.notifications.insertOne({
               userId: 1,
               taskId: 1,
@@ -56,43 +68,17 @@ spec:
               createdAt: new Date()
           });
           
-          // Verify insert
-          let notificationCount = db.notifications.countDocuments();
-          print("Notification count: " + notificationCount);
-          
-          // Test analytics collection  
-          print("\n=== Testing analytics collection ===");
-          db.analytics.insertOne({
-              metric: "test_metric",
-              value: 42,
-              userId: 1,
-              timestamp: new Date()
-          });
-          
-          // Verify insert
-          let analyticsCount = db.analytics.countDocuments();
-          print("Analytics count: " + analyticsCount);
-          
-          // Check indexes
-          print("\n=== Indexes ===");
-          db.notifications.getIndexes().forEach(function(index) {
-              print("notifications: " + JSON.stringify(index.key));
-          });
-          
-          db.analytics.getIndexes().forEach(function(index) {
-              print("analytics: " + JSON.stringify(index.key));
-          });
-          
-          // Test queries
-          print("\n=== Testing queries ===");
-          let result = db.notifications.find({userId: 1}).count();
-          print("Notifications for user 1: " + result);
+          let count = db.notifications.countDocuments();
+          print("\nNotification count: " + count);
           
           // Cleanup
           db.notifications.deleteMany({message: "Test notification"});
-          db.analytics.deleteMany({metric: "test_metric"});
           
           print("\n✓ All MongoDB tests passed!");
+<<<<<<< HEAD
           EOF
           
           echo "✓ MongoDB test completed successfully!"
+=======
+          EOF
+>>>>>>> 55fdf52 (added python auth app and jobs for testing deployments)

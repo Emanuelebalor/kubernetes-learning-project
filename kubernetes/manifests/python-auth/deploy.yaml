@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: python-auth
+  namespace: microservices
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: python-auth
+  template:
+    metadata:
+      labels:
+        app: python-auth
+    spec:
+      containers:
+      - name: python-auth
+        image: python-auth:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8001
+        envFrom:
+        - configMapRef:
+            name: python-auth-config
+        env:
+        - name: DB_PASS
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials  # Local secret in microservices namespace
+              key: DB_PASS
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: python-auth-secret
+              key: JWT_SECRET
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
